@@ -1,89 +1,60 @@
+import os
 import streamlit as st
 import tensorflow as tf
-import numpy as np
-import cv2
 from PIL import Image
-from utils.preprocessing import preprocess_image
+import numpy as np
+import gdown
 
-# ===============================
-# Konfigurasi Halaman
-# ===============================
-st.set_page_config(
-    page_title="ECG Classification Fusion CNN",
-    page_icon="❤️",
-    layout="centered"
-)
+# ---------------------------
+# SETUP MODEL PATH DAN DOWNLOAD
+# ---------------------------
+os.makedirs("models", exist_ok=True)
 
-st.title("❤️ Klasifikasi Sinyal ECG")
-st.caption("VGG19 + DenseNet201 + InceptionV3 | Decision Fusion")
+# Google Drive file IDs untuk model
+VGG19_ID = "YOUR_VGG19_FILE_ID"
+DENSE_ID = "YOUR_DENSE_FILE_ID"
+INC_ID = "YOUR_INCEPTION_FILE_ID"
 
-CLASS_NAMES = ["H2O", "H2O+NaOH"]
+def download_model(file_id, output_path):
+    if not os.path.exists(output_path):
+        url = f"https://drive.google.com/drive/folders/1kgYrgIK7eyD0bJOmITyKmJO9NRFiqW0O?usp=sharing"
+        st.info(f"Downloading {os.path.basename(output_path)} from Google Drive...")
+        gdown.download(url, output_path, quiet=False)
+    else:
+        st.success(f"{os.path.basename(output_path)} already exists.")
 
-# ===============================
-# Load Model (Cache)
-# ===============================
+# Download semua model
+download_model(VGG19_ID, "models/vgg19_best_model.h5")
+download_model(DENSE_ID, "models/dense_best_model.h5")
+download_model(INC_ID, "models/inception_best_model.h5")
+
+# ---------------------------
+# LOAD MODEL
+# ---------------------------
 @st.cache_resource
 def load_models():
-    vgg = tf.keras.models.load_model("models/vgg19_best_model.h5")
-    dense = tf.keras.models.load_model("models/densenet201_best_model.h5")
-    inc = tf.keras.models.load_model("models/inceptionv3_best_model.h5")
-    return vgg, dense, inc
+    vgg_model = tf.keras.models.load_model("models/vgg19_best_model.h5")
+    dense_model = tf.keras.models.load_model("models/dense_best_model.h5")
+    inc_model = tf.keras.models.load_model("models/inception_best_model.h5")
+    return vgg_model, dense_model, inc_model
 
-with st.spinner("🔄 Memuat model..."):
-    vgg_model, dense_model, inc_model = load_models()
+vgg_model, dense_model, inc_model = load_models()
 
-st.success("✅ Model berhasil dimuat")
+# ---------------------------
+# STREAMLIT APP
+# ---------------------------
+st.title("Klasifikasi H2O & H2O + NaOH")
 
-# ===============================
-# Upload Gambar
-# ===============================
-uploaded_file = st.file_uploader(
-    "📤 Upload citra ECG",
-    type=["png", "jpg", "jpeg"]
-)
+uploaded_file = st.file_uploader("Upload gambar", type=["jpg", "png", "jpeg"])
 
-if uploaded_file:
+if uploaded_file is not None:
     image = Image.open(uploaded_file).convert("RGB")
-    st.image(image, caption="Citra ECG", use_column_width=True)
+    st.image(image, caption="Uploaded Image", use_column_width=True)
 
-    img_np = np.array(image)
+    # Contoh preprocessing
+    img_array = np.array(image.resize((224, 224)))/255.0
+    img_array = np.expand_dims(img_array, axis=0)
 
-    # ===============================
-    # Preprocessing
-    # ===============================
-    img_vgg = preprocess_image(img_np, "vgg")
-    img_dense = preprocess_image(img_np, "densenet")
-    img_inc = preprocess_image(img_np, "inception")
-
-    # ===============================
-    # Prediksi
-    # ===============================
-    with st.spinner("🧠 Menganalisis..."):
-        pred_vgg = vgg_model.predict(img_vgg)[0][0]
-        pred_dense = dense_model.predict(img_dense)[0][0]
-        pred_inc = inc_model.predict(img_inc)[0][0]
-
-        # Equal Weight Fusion (SAMA dengan Colab)
-        fusion_prob = (pred_vgg + pred_dense + pred_inc) / 3
-        fusion_label = CLASS_NAMES[int(fusion_prob > 0.5)]
-
-    # ===============================
-    # Output
-    # ===============================
-    st.subheader("📊 Hasil Prediksi")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.metric("Fusion Prediction", fusion_label)
-
-    with col2:
-        st.metric("Confidence", f"{fusion_prob:.4f}")
-
-    st.markdown("---")
-    st.write("### 🔍 Probabilitas Model Individu")
-    st.write(f"- **VGG19**       : {pred_vgg:.4f}")
-    st.write(f"- **DenseNet201**: {pred_dense:.4f}")
-    st.write(f"- **InceptionV3**: {pred_inc:.4f}")
-
-    st.info("📌 Threshold klasifikasi = 0.5 (sesuai Colab)")
+    # Prediksi (contoh menggunakan vgg_model)
+    pred = vgg_model.predict(img_array)
+    st.write("Prediksi VGG19:", pred)
