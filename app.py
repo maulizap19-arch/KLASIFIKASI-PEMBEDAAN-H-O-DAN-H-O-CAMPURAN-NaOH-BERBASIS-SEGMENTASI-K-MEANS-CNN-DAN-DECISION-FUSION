@@ -17,7 +17,7 @@ INC_ID = "YOUR_INCEPTION_FILE_ID"
 
 def download_model(file_id, output_path):
     if not os.path.exists(output_path):
-        url = f"https://drive.google.com/drive/folders/1kgYrgIK7eyD0bJOmITyKmJO9NRFiqW0O?usp=sharing"
+        url = f"https://drive.google.com/drive/folders/1kgYrgIK7eyD0bJOmITyKmJO9NRFiqW0O?usp=drive_link"
         st.info(f"Downloading {os.path.basename(output_path)} from Google Drive...")
         gdown.download(url, output_path, quiet=False)
     else:
